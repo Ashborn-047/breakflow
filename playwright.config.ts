@@ -15,6 +15,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     channel: process.env.CI ? 'chromium' : 'chrome',
     headless: true,
+    timezoneId: 'UTC',
   },
   webServer: {
     command: 'npm run dev',

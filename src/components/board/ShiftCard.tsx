@@ -243,8 +243,7 @@ export const ShiftCard: React.FC<ShiftCardProps> = ({
                   onClick={() => onOpenKioskForShift(shift.id)}
                   className="btn btn-subtle btn-sm"
                   style={{ cursor: 'pointer' }}
-                  disabled={!isLive}
-                  title={isLive ? 'Log an employee break' : 'Shift currently off duty'}
+                  title={isLive ? 'Log an employee break' : 'Log an employee break (off-shift)'}
                 >
                   <Plus size={13} />
                   <span>Log break</span>
@@ -303,9 +302,8 @@ export const ShiftCard: React.FC<ShiftCardProps> = ({
         <button
           onClick={() => onOpenKioskForShift(shift.id)}
           className={isFull ? 'btn btn-warning btn-sm' : 'btn btn-primary btn-sm'}
-          disabled={!isLive}
           data-testid={`shift-action-${shift.id}`}
-          style={{ cursor: isLive ? 'pointer' : 'not-allowed' }}
+          style={{ cursor: 'pointer' }}
           title={isFull ? 'Break slots full: click to view capacity details' : 'Log a break for this shift'}
         >
           <Coffee size={13} />
