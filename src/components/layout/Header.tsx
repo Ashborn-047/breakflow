@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <HardDrive size={13} color="var(--mint)" />
-            <Cloud size={14} color={syncStatus.cloudConnected ? 'var(--brand)' : 'var(--ink-muted)'} />
+            <Cloud size={14} color={syncStatus.cloudConnected ? 'var(--mint)' : 'var(--ink-muted)'} />
           </div>
           <span style={{ fontWeight: 600, color: 'var(--ink-primary)' }}>
             {syncStatus.cloudConnected

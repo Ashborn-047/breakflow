@@ -12,13 +12,12 @@ export class SpacetimeDriver implements StorageAdapter {
   private host: string;
   private dbName: string;
   private token: string | null;
-  private ws: WebSocket | null = null;
   private connected: boolean = false;
   private pingInterval: number | null = null;
   private listeners: Set<(state: BreakTrackerState) => void> = new Set();
   private onStatusChange?: (connected: boolean, latencyMs?: number, error?: string) => void;
 
-  // Cached state received from SpacetimeDB or local fallback
+  // Cached state
   private state: BreakTrackerState = {
     shifts: [],
     employees: [],
@@ -33,77 +32,59 @@ export class SpacetimeDriver implements StorageAdapter {
     this.onStatusChange = options.onStatusChange;
     this.state = initialFallbackState;
 
-    this.connect();
+    this.init();
   }
 
-  private getWsUrl(): string {
-    let cleanHost = this.host.trim();
-    if (cleanHost.startsWith('http://')) {
-      cleanHost = cleanHost.replace('http://', 'ws://');
-    } else if (cleanHost.startsWith('https://')) {
-      cleanHost = cleanHost.replace('https://', 'wss://');
-    } else if (!cleanHost.startsWith('ws://') && !cleanHost.startsWith('wss://')) {
-      cleanHost = 'wss://' + cleanHost;
+  private getHttpBaseUrl(): string {
+    let clean = this.host.trim();
+    if (clean.startsWith('wss://')) {
+      clean = clean.replace('wss://', 'https://');
+    } else if (clean.startsWith('ws://')) {
+      clean = clean.replace('ws://', 'http://');
+    } else if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = 'https://' + clean;
     }
-    // SpacetimeDB standard websocket endpoint
-    const url = new URL(cleanHost);
-    return `${url.protocol}//${url.host}/database/ws/${encodeURIComponent(this.dbName)}`;
+    const url = new URL(clean);
+    return `${url.protocol}//${url.host}/v1/database/${encodeURIComponent(this.dbName)}`;
   }
 
-  private connect() {
+  private async init() {
+    await this.checkHealth();
+    this.startHeartbeat();
+  }
+
+  public async checkHealth(): Promise<boolean> {
+    const baseUrl = this.getHttpBaseUrl();
+    const start = performance.now();
     try {
-      const wsUrl = this.getWsUrl();
-      const startTime = performance.now();
+      const res = await fetch(`${baseUrl}/sql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'SELECT * FROM employee;',
+      });
 
-      this.ws = new WebSocket(wsUrl);
-
-      this.ws.onopen = () => {
-        const latency = Math.round(performance.now() - startTime);
+      if (res.ok) {
+        const latency = Math.max(1, Math.round(performance.now() - start));
         this.connected = true;
         this.onStatusChange?.(true, latency);
-        this.startHeartbeat();
-        this.sendSubscription();
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          this.handleMessage(event.data);
-        } catch (e) {
-          console.warn('SpacetimeDB message parsing error:', e);
-        }
-      };
-
-      this.ws.onerror = (_err) => {
+        return true;
+      } else {
         this.connected = false;
-        this.onStatusChange?.(false, undefined, `Connection to ${this.dbName} failed`);
-      };
-
-      this.ws.onclose = () => {
-        this.connected = false;
-        this.stopHeartbeat();
-        this.onStatusChange?.(false, undefined, 'Disconnected');
-      };
+        this.onStatusChange?.(false, undefined, `HTTP error ${res.status}`);
+        return false;
+      }
     } catch (err: any) {
       this.connected = false;
-      this.onStatusChange?.(false, undefined, err?.message || 'Failed to initialize WebSocket');
+      this.onStatusChange?.(false, undefined, err?.message || 'Connection failed');
+      return false;
     }
   }
 
   private startHeartbeat() {
     this.stopHeartbeat();
     this.pingInterval = window.setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        const start = performance.now();
-        // SpacetimeDB ping or probe
-        try {
-          this.ws.send(JSON.stringify({ type: 'ping' }));
-          const latency = Math.round(performance.now() - start);
-          this.onStatusChange?.(true, latency);
-        } catch {
-          // ignore
-        }
-      }
-    }, 15000);
+      this.checkHealth();
+    }, 10000);
   }
 
   private stopHeartbeat() {
@@ -113,39 +94,21 @@ export class SpacetimeDriver implements StorageAdapter {
     }
   }
 
-  private sendSubscription() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+  private async callReducer(reducerName: string, args: any[]): Promise<boolean> {
+    const baseUrl = this.getHttpBaseUrl();
     try {
-      // Subscribe to all tables: shift, employee, breakLog
-      const subscribeMsg = {
-        Subscribe: {
-          query_strings: [
-            'SELECT * FROM shift',
-            'SELECT * FROM employee',
-            'SELECT * FROM break_log',
-          ],
+      const res = await fetch(`${baseUrl}/call/${reducerName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
         },
-      };
-      this.ws.send(JSON.stringify(subscribeMsg));
-    } catch (e) {
-      console.warn('Subscription error:', e);
-    }
-  }
-
-  private handleMessage(data: any) {
-    if (typeof data !== 'string') return;
-    try {
-      const msg = JSON.parse(data);
-      if (msg.IdentityToken) {
-        this.token = msg.IdentityToken.token;
-        if (this.token) {
-          localStorage.setItem('breakflow_spacetime_token', this.token);
-        }
-      }
-      // Process table diffs / initial state updates
-      this.notify();
-    } catch {
-      // Ignore unparseable frames
+        body: JSON.stringify(args),
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn(`SpacetimeDB callReducer (${reducerName}) failed:`, err);
+      return false;
     }
   }
 
@@ -177,18 +140,10 @@ export class SpacetimeDriver implements StorageAdapter {
     employeeId: string,
     shiftId: string
   ): Promise<{ success: boolean; error?: string }> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          CallReducer: {
-            reducer: 'start_break',
-            args: [employeeId, shiftId],
-          },
-        })
-      );
-    }
+    // Cloud dispatch
+    this.callReducer('start_break', [employeeId, shiftId]);
 
-    // Optimistic local state update for zero perceived latency
+    // Optimistic local state update
     const emp = this.state.employees.find(e => e.id === employeeId);
     if (emp) {
       emp.activeBreakStartMs = Date.now();
@@ -199,16 +154,8 @@ export class SpacetimeDriver implements StorageAdapter {
   }
 
   public async endBreak(employeeId: string): Promise<{ success: boolean; error?: string }> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          CallReducer: {
-            reducer: 'end_break',
-            args: [employeeId],
-          },
-        })
-      );
-    }
+    // Cloud dispatch
+    this.callReducer('end_break', [employeeId]);
 
     // Optimistic local state update
     const emp = this.state.employees.find(e => e.id === employeeId);
@@ -239,16 +186,7 @@ export class SpacetimeDriver implements StorageAdapter {
 
   public async addEmployee(name: string): Promise<Employee> {
     const id = 'emp_' + Math.random().toString(36).slice(2, 8);
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          CallReducer: {
-            reducer: 'register_employee',
-            args: [id, name],
-          },
-        })
-      );
-    }
+    this.callReducer('register_employee', [id, name]);
 
     const newEmp: Employee = { id, name: name.trim(), dailyUsedSeconds: 0 };
     this.state.employees.push(newEmp);
@@ -257,32 +195,14 @@ export class SpacetimeDriver implements StorageAdapter {
   }
 
   public async removeEmployee(employeeId: string): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          CallReducer: {
-            reducer: 'remove_employee',
-            args: [employeeId],
-          },
-        })
-      );
-    }
+    this.callReducer('remove_employee', [employeeId]);
 
     this.state.employees = this.state.employees.filter(e => e.id !== employeeId);
     this.notify();
   }
 
   public async resetDay(): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          CallReducer: {
-            reducer: 'reset_day',
-            args: [],
-          },
-        })
-      );
-    }
+    this.callReducer('reset_day', []);
 
     this.state.employees = this.state.employees.map(e => ({
       ...e,
@@ -296,14 +216,7 @@ export class SpacetimeDriver implements StorageAdapter {
 
   public destroy(): void {
     this.stopHeartbeat();
-    if (this.ws) {
-      try {
-        this.ws.close();
-      } catch {
-        // ignore
-      }
-      this.ws = null;
-    }
     this.listeners.clear();
   }
 }
+
