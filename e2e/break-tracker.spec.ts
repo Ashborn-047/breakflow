@@ -32,8 +32,8 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
     await expect(page.locator('text=Team Roster Management')).toBeVisible();
 
     // Check first and last employee to verify ascending order
-    await expect(page.locator('strong:has-text("Employee 01")')).toBeVisible();
-    await expect(page.locator('strong:has-text("Employee 24")')).toBeVisible();
+    await expect(page.locator('strong:has-text("Abhay Mishra")')).toBeVisible();
+    await expect(page.locator('strong:has-text("Vedika Vivek Bhosle")')).toBeVisible();
 
     // Verify total count
     await expect(page.locator('text=Total registered: 24')).toBeVisible();
@@ -46,26 +46,26 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
     await page.click('button:has-text("Take a break")');
     await expect(page.locator('text=Take a Break · Punch Terminal')).toBeVisible();
 
-    // Click first employee (Employee 01)
-    await page.click('strong:has-text("Employee 01")');
-    await expect(page.locator('h4:has-text("Employee 01")')).toBeVisible();
+    // Click first employee (Abhay Mishra)
+    await page.click('strong:has-text("Abhay Mishra")');
+    await expect(page.locator('h4:has-text("Abhay Mishra")')).toBeVisible();
 
     // Start break
     await page.click('button:has-text("Start Break")');
 
     // Verify toast notification
-    await expect(page.locator('text=Employee 01 is now on break')).toBeVisible();
+    await expect(page.locator('text=Abhay Mishra is now on break')).toBeVisible();
 
     // Verify On Break Now is 1
     await expect(page.locator('text=1 break in progress')).toBeVisible();
 
-    // Verify live break card on shift board shows Employee 01
-    await expect(page.locator('strong:has-text("Employee 01")')).toBeVisible();
+    // Verify live break card on shift board shows Abhay Mishra
+    await expect(page.locator('strong:has-text("Abhay Mishra")')).toBeVisible();
     await expect(page.locator('text=Break active')).toBeVisible();
 
     // End break
     await page.click('button:has-text("End break") >> nth=0');
-    await expect(page.locator('text=Employee 01 break ended')).toBeVisible();
+    await expect(page.locator('text=Abhay Mishra break ended')).toBeVisible();
 
     // Verify back to 0 on break
     await expect(page.locator('text=All team members on duty')).toBeVisible();
@@ -75,15 +75,15 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
     // 1st employee on Night shift (active at night)
     await page.click('button:has-text("Take a break")');
     await page.click('button:has-text("Night shift")');
-    await page.fill('input[placeholder*="Type your name"]', 'Employee 01');
-    await page.click('strong:has-text("Employee 01")');
+    await page.fill('input[placeholder*="Type your name"]', 'Abhay');
+    await page.click('strong:has-text("Abhay Mishra")');
     await page.click('button:has-text("Start Break")');
 
     // 2nd employee on Night shift
     await page.click('button:has-text("Take a break")');
     await page.click('button:has-text("Night shift")');
-    await page.fill('input[placeholder*="Type your name"]', 'Employee 02');
-    await page.click('strong:has-text("Employee 02")');
+    await page.fill('input[placeholder*="Type your name"]', 'Abhijit');
+    await page.click('strong:has-text("Abhijit Bhattacharjee")');
     await page.click('button:has-text("Start Break")');
 
     // Night shift now has 2 of 2 active breaks
@@ -97,8 +97,8 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
     await expect(page.locator('text=Night shift (22:00 – 08:00) has reached maximum concurrent capacity')).toBeVisible();
 
     // Verify active members are listed in the modal
-    await expect(page.locator('.modal-content >> text=Employee 01')).toBeVisible();
-    await expect(page.locator('.modal-content >> text=Employee 02')).toBeVisible();
+    await expect(page.locator('.modal-content >> text=Abhay Mishra')).toBeVisible();
+    await expect(page.locator('.modal-content >> text=Abhijit Bhattacharjee')).toBeVisible();
 
     // End one break directly from the full modal to free up a slot
     await page.click('.modal-content >> button:has-text("End Break") >> nth=0');
@@ -111,14 +111,14 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
   test('5. Tab Navigation & Telemetry Views', async ({ page }) => {
     // Start 1 break
     await page.click('button:has-text("Take a break")');
-    await page.fill('input[placeholder*="Type your name"]', 'Employee 03');
-    await page.click('strong:has-text("Employee 03")');
+    await page.fill('input[placeholder*="Type your name"]', 'Anik');
+    await page.click('strong:has-text("Anik Saha")');
     await page.click('button:has-text("Start Break")');
 
     // Switch to Tab 2: Live Capacity & Telemetry
     await page.click('button:has-text("Live Capacity & Telemetry")');
     await expect(page.locator('text=Who Is Currently On Break')).toBeVisible();
-    await expect(page.locator('strong:has-text("Employee 03")')).toBeVisible();
+    await expect(page.locator('strong:has-text("Anik Saha")')).toBeVisible();
     await expect(page.locator('text=Shift Capacity Saturation')).toBeVisible();
 
     // Switch to Tab 3: Productivity & Analytics
@@ -137,15 +137,15 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
     await page.click('button:has-text("Roster")');
 
     // Add new member
-    await page.fill('input[placeholder*="Add new employee"]', 'Employee 25');
+    await page.fill('input[placeholder*="Add new employee"]', 'Test Employee');
     await page.click('button:has-text("Add Member")');
 
-    await expect(page.locator('text=Employee 25 added to roster')).toBeVisible();
+    await expect(page.locator('text=Test Employee added to roster')).toBeVisible();
     await expect(page.locator('text=Total registered: 25')).toBeVisible();
 
     // Accept browser dialog on remove
     page.once('dialog', dialog => dialog.accept());
-    await page.locator('[data-testid="remove-employee-25"]').click();
+    await page.locator('[data-testid^="remove-"]').last().click();
 
     await expect(page.locator('text=Employee removed from database')).toBeVisible();
     await expect(page.locator('text=Total registered: 24')).toBeVisible();
@@ -174,8 +174,8 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
   test('8. Reset Day Flow', async ({ page }) => {
     // Start a break
     await page.click('button:has-text("Take a break")');
-    await page.fill('input[placeholder*="Type your name"]', 'Employee 09');
-    await page.click('strong:has-text("Employee 09")');
+    await page.fill('input[placeholder*="Type your name"]', 'Biprojit');
+    await page.click('strong:has-text("Biprojit Paul")');
     await page.click('button:has-text("Start Break")');
 
     await expect(page.locator('text=1 break in progress')).toBeVisible();
@@ -190,11 +190,11 @@ test.describe('BreakFlow Comprehensive Test Suite', () => {
 
   test('9. Search Filtering in Kiosk and Shift Board', async ({ page }) => {
     // Search in main navigation
-    await page.fill('input[placeholder*="Search team member"]', 'Employee 23');
+    await page.fill('input[placeholder*="Search team member"]', 'Swatilekha');
     // Open Kiosk and test dynamic autocomplete filter
     await page.click('button:has-text("Take a break")');
-    await page.fill('input[placeholder*="Type your name"]', 'Employee 24');
-    await expect(page.locator('strong:has-text("Employee 24")')).toBeVisible();
+    await page.fill('input[placeholder*="Type your name"]', 'Vedika');
+    await expect(page.locator('strong:has-text("Vedika Vivek Bhosle")')).toBeVisible();
     // Non-existent search shows no matches with option to register
     await page.fill('input[placeholder*="Type your name"]', 'NonExistentPersonXYZ');
     await expect(page.locator('text=No match found for "NonExistentPersonXYZ"')).toBeVisible();

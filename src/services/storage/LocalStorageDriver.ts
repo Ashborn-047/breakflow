@@ -23,9 +23,17 @@ export class LocalStorageDriver implements StorageAdapter {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
+        let emps = parsed.employees?.length ? parsed.employees : INITIAL_PLACEHOLDER_EMPLOYEES;
+        // Auto-upgrade generic placeholder names back to real roster names
+        if (emps.some((e: any) => e.name && /^Employee\s+\d+$/i.test(e.name))) {
+          emps = INITIAL_PLACEHOLDER_EMPLOYEES.map(def => {
+            const existing = emps.find((e: any) => e.id === def.id);
+            return existing ? { ...existing, name: def.name } : def;
+          });
+        }
         return {
           shifts: parsed.shifts?.length ? parsed.shifts : DEFAULT_SHIFTS,
-          employees: parsed.employees?.length ? parsed.employees : INITIAL_PLACEHOLDER_EMPLOYEES,
+          employees: emps,
           breakLogs: parsed.breakLogs || [],
           day: parsed.day || new Date().toDateString(),
         };

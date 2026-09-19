@@ -27,6 +27,7 @@ spacetimedb/*.local.json
 employees.txt
 employees*.txt
 update-employees.js
+scripts/
 
 # Logs
 npm-debug.log*
