@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production and test outputs
+dist/
+dist-ssr/
+build/
+test-results/
+playwright-report/
+blob-report/
+tsconfig.tsbuildinfo
+
+# SpacetimeDB outputs
+spacetimedb/spacetimedb/dist/
+spacetimedb/spacetimedb/node_modules/
+spacetimedb-rust/target/
+spacetimedb/*.local.json
+
+# Environment and secrets / Internal data
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+employees.txt
+employees*.txt
+update-employees.js
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# System files
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
